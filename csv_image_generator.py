@@ -8,9 +8,7 @@ from skimage.transform import warp, SimilarityTransform
 from skimage.exposure import adjust_gamma
 
 def img_debug(img, info):
-    """
-    Output debug information
-    """
+    """A simple function used to output debug information"""
     print(info)
     print('max='+str(np.max(img)))
     print('min='+str(np.min(img)))
@@ -18,6 +16,30 @@ def img_debug(img, info):
     print()
     
 def get_image_label_from_datum(datum, data_augmentation_params):
+    """Generate actual image object and measurement from a given datum object.
+    
+    Args:
+        datum: A dict to save one image path and the corresponding steering angle,
+            image augmentation intensity.
+            For exmaple:
+            datum = {'path': image_path,
+                     'steering': steering angle measurement,
+                     'horizontal_shift_intensity': ramdon horizontal shift intensity (-0.5 ~ 0.5)
+                                                   used to calculate actual steering angle 
+                                                   after applied data augmentation,
+                     'is_flipped': Defined whether the image is fliped}
+        data_augmentation_params: A dict to control data augmentation pipeline
+            for example:
+            data_augmentation_params = {
+                                'steering_angle_per_pixel': 0.005,
+                                'horizontal_shift_range': 30, 
+                                'vertical_shift_range': 30,
+                                }
+    Returns:
+        image: Image object after data augmentation
+        measurement: Steering angle measurement after data augmentation
+
+    """
     # Unpack datum
     image_path = datum['path']
     measurement = datum['steering']
@@ -25,7 +47,8 @@ def get_image_label_from_datum(datum, data_augmentation_params):
     is_flipped = datum['is_flipped']
 
     # Read image
-    image = cv2.imread(image_path)
+    image = cv2.imread(image_path) # BGR
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     
     # Flip it horizontally if needed
     if is_flipped:
@@ -36,7 +59,10 @@ def get_image_label_from_datum(datum, data_augmentation_params):
                                                   measurement, 
                                                   horizontal_shift,                                                    
                                                   data_augmentation_params)
-
+                                                  
+    # Convert to HLS color space
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2HLS)
+    
     return image, measurement
     
 def apply_image_augmentation(image, 
@@ -67,10 +93,10 @@ def random_brightness(img):
 def random_shadow(img):   
     h, w = img.shape[0], img.shape[1]
     
-    left_y = np.random.randint(h/3, h, 2) 
-    right_y = np.random.randint(h/3, h, 2)
-    left_y = np.sort(left_y)
-    right_y = np.sort(right_y)
+    left_y = np.random.randint(-1*h, 2*h, 2) 
+    right_y = np.random.randint(-1*h, 2*h, 2)
+    #left_y = np.sort(left_y)
+    #right_y = np.sort(right_y)
     
     if left_y[0] == right_y[0] or left_y[1] == right_y[1]:
         return img
@@ -88,7 +114,7 @@ def random_shadow(img):
     
     shadow_mask = (shadow_mask_1 & shadow_mask_2)
     
-    img[shadow_mask, 2] *= np.random.uniform() * 0.5 + 0.25
+    img[shadow_mask, 2] *= np.random.uniform() * 0.3 + 0.2 # 0.2 ~ 0.5
     
     img = convert_colorspace(img, 'HSV', 'RGB')
     
@@ -136,8 +162,18 @@ def histogram_equalization(data, data_augmentation_params, bounds=[-1.5, 1.5], b
     return output_data
     
 def csv_image_generator(csv_paths, BATCH_SIZE=128):
-    """
-    keras data generator
+    """keras data generator
+    
+    Receives csv paths, yield batch of images and measurements.
+    Args:
+        csv_paths: csv file paths, defined in data.py
+            examples:
+            [{'folder_path': csv_folder_path, 'csv_file_name': csv file name, 'type': mac or win, 'track': track1 or track2},
+            {}, {}]
+        BATCH_SIZE: defines the size of each batch
+    Yields:
+        batch_x: A batch of images
+        batch_y: The measurements of the corresponding images
     """
 
     # Read all csv records into lines[]
@@ -175,6 +211,7 @@ def csv_image_generator(csv_paths, BATCH_SIZE=128):
                 lines.append(line)
                 track_count[csv_track] += 1
     
+    # Count the number of images from each track.
     # print("Track 1 log : " , track_count[1])
     # print("Track 2 log : " , track_count[2])
     
@@ -194,6 +231,8 @@ def csv_image_generator(csv_paths, BATCH_SIZE=128):
     side_camera_correction = data_augmentation_params['steering_angle_per_pixel'] * side_camera_shift_pixels
     data = []
     
+    # Read center, left, right images and measurements for each line,
+    # Convert each image into one datum
     for line in lines:
         # Get image path for center, left, right cameras
         path_center = line[0]
@@ -254,10 +293,11 @@ def csv_image_generator(csv_paths, BATCH_SIZE=128):
             end = offset + BATCH_SIZE
             batch_data = equ_data[offset:end]
             
-            # Read images, flip it if necessary, then image augmentation
+            # Read images, flip it if necessary, then apply image augmentation
             batch_images = []
             batch_measurements = []
             
+            # Convert datum into real image object and measurement
             for datum in batch_data:
                 single_image, single_measurement = get_image_label_from_datum(datum, data_augmentation_params)
                 batch_images.append(single_image)

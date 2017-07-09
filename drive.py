@@ -16,11 +16,14 @@ from keras.models import load_model
 import h5py
 from keras import __version__ as keras_version
 
+import cv2
+
 sio = socketio.Server()
 app = Flask(__name__)
 model = None
 prev_image_array = None
 
+steering_angles = []
 
 class SimplePIController:
     def __init__(self, Kp, Ki):
@@ -61,7 +64,18 @@ def telemetry(sid, data):
         imgString = data["image"]
         image = Image.open(BytesIO(base64.b64decode(imgString)))
         image_array = np.asarray(image)
+        
+        # Convert color space from RGB to ? (if necessary)
+        #image_array = cv2.cvtColor(image_array, cv2.COLOR_RGB2HLS) # RGB -> YUV? HLS? HSV?
+        
         steering_angle = float(model.predict(image_array[None, :, :, :], batch_size=1))
+        
+        # Buffer latest three predictions of steering angle to smooth the vehicle control
+        steering_angles.append(steering_angle)
+        while len(steering_angles) > 3:
+            steering_angles.pop(0)
+            
+        steering_angle = np.mean(steering_angles)
 
         throttle = controller.update(float(speed))
 

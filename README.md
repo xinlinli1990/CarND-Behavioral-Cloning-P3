@@ -14,10 +14,10 @@ This project aims to use end-to-end learning approach to mimic human driving beh
 The simulator allow player manipulate the steering angle and the throttle of the vehicle.
 
 The goals / steps of this project are the following:
-* Use the simulator to collect data of good driving behavior
-* Build a convolution neural network in Keras that control steering angles from images
-* Use PID to control the throttle that maintain the car speed 
-* Test that the model successfully drives around track one without leaving the road
+* Use the simulator to collect data of good driving behavior.
+* Train a convolution neural network in Keras that predict steering angles from images.
+* Use PID to control the throttle that maintain the car speed.
+* Test that the model successfully drives around both tracks without leaving the road.
 
 ## Video
 
@@ -26,14 +26,14 @@ The goals / steps of this project are the following:
 
 ## Code
 
-| File Name           |     Description	                                                               | 
-|:-------------------:|:------------------------------------------------------------------------------:|
-|data_generator.py    | Defines a batch data generator for Keras including data augmanetation methods  |
-|model.py             | Contains the code for training and saving the convolution neural network model |
-|drive.py             | Loads a trained model for driving car simulator in autonomous mode             |
-|model.h5             | A trained convolution neural network model                                     |
-|README.md            | The introduction file you are reading                                          |
-|submit.mp4           | Records the trained model finish the track one in autonomous mode              |
+| File Name            |     Description	                                                            | 
+|:--------------------:|:------------------------------------------------------------------------------:|
+|csv_image_generator.py| Defines a batch data generator for Keras including data augmanetation methods  |
+|data.py               | Defines the paths of training dataset and validation dataset                   |
+|model.py              | Contains the code for training and saving the convolution neural network model |
+|drive.py              | Loads a trained model for driving car simulator in autonomous mode             |
+|model.h5              | A trained convolution neural network model                                     |
+|README.md             | The introduction file you are reading                                          |
 
 Using the Udacity provided simulator and my drive.py file, the car can be driven autonomously around the track by executing 
 ```sh
@@ -44,21 +44,22 @@ python drive.py model.h5
 
 ### Data collection
 
-The simulator would captures frames from three cameras on the front face of the car 
-and records their corresponding driving speed, throttle and steering angle.	
+To train a neural network to mimic my driving behavior, a driving behavior dataset need to be collected. 
+In this project, the car simulator is able to capture frames from three cameras on the front face of the car 
+and records the corresponding driving behaviors (driving speed, throttle and steering angle).	
 ![front-3](./images/front-3.jpg)
 
-The driving simulator provide two different tracks. In this project, due to time limitation, 
-only track one was used. To capture good driving behavior, I recorded three laps on track one 
-using center lane driving and another three laps center lane driving in the reverse direction. Additionally,
-one lap side-driving data was also collected for left and right side, both directions respectively.
+The driving simulator provide two different tracks. In this project, I developed all my methods with the first track.
+After the model performs well on the first track, I added the second track data into my dataset thus the model can work on both tracks.
+To capture good driving behavior, I recorded two laps using center lane driving and another two laps center lane driving in the reverse direction. 
+Additionally, one lap side-driving data was also collected for left and right side, both directions respectively.
 
-To teach the car how to handle the situation that it get out of the road, two laps "recovery" data was also 
+To teach the car how to handle the situation that it get out of the road, one lap "recovery" data was also 
 collected which contains the behavior that driving from both road sides to the road center.
 
 ### Data analysis
 
-I randomly picked 6400 images (50 batches) from the dataset and ploted their histogram. 
+To analyze the dataset collected from the first track, I randomly picked 6400 images (50 batches) from the dataset and ploted their histogram. 
 
 At first, I plot a histogram for the images captured by the center camera. 
 From the histogram, we can see that almost half of the images have zero steering angle. 
@@ -68,9 +69,9 @@ thus the car prefer to drive straight without steering.
 
 ### Data augmentation
 
-The track one is a circle, which contains lots of "left turn". The data collected on track one might introduce 
-"left turn" bias. To generalize this dataset, images were fliped to make the histogram symmetric.
-Here is an example of a image has been flipped.	
+The track one is a circle, which contains lots of "left turn". The data collected on track one will introduce 
+"left turn" bias into the neural network. To generalize this dataset, images were horizontally fliped to make the histogram symmetric.
+Here is an example of a image has been horizontally flipped.	
 ![flip](./images/flip.jpg)
 
 To better balance the dataset and solve the "zero" bias, the images from two side cameras were also used. 
@@ -93,7 +94,7 @@ data_augmentation_params = {
 
 
 Although left and right cameras solved the "zero" bias problem, the dataset is still quite unbalanced. 
-To solve this problem, two image augmentation methods were implemented. The random brightness method 
+To solve this problem, three image augmentation methods were implemented. The random brightness method 
 
 ```python
 def random_brightness(img):
@@ -114,10 +115,46 @@ def random_shift_transoform(img, measurement, horizontal_range, vertical_range, 
     tform = SimilarityTransform(translation=(transform_x, transform_y))
     img = warp(img, tform)
     return img, measurement
+	
+def random_shadow(img):   
+    h, w = img.shape[0], img.shape[1]
+   
+	# Pick two random points on the left side of image
+    left_y = np.random.randint(-1*h, 2*h, 2)
+	# Pick two random points on the right side of image
+    right_y = np.random.randint(-1*h, 2*h, 2)
+    
+    if left_y[0] == right_y[0] or left_y[1] == right_y[1]:
+        return img
+		
+    img = convert_colorspace(img, 'RGB', 'HSV')  # 0-1 float64
+    X_m = np.mgrid[0:img.shape[0],0:img.shape[1]][1] # x coordinates of mask
+    Y_m = np.mgrid[0:img.shape[0],0:img.shape[1]][0] # y coordinates of mask
+
+    # line defined by (0, left_y[0]) and (w, right_y[0])
+	line1 = ((Y_m - right_y[0]) / (left_y[0] - right_y[0]) - (X_m - w) / (0.0 - w))
+	# mask1: area lower than line1
+    shadow_mask_1 = line1 <= 0
+    # line defined by (0, left_y[1]) and (w, right_y[1])
+	line2 = ((Y_m - right_y[1]) / (left_y[1] - right_y[1]) - (X_m - w) / (0.0 - w))
+	# mask2: area higher than line2
+    shadow_mask_2 = line2 >= 0
+    
+	# Combine mask1 and mask2
+    shadow_mask = (shadow_mask_1 & shadow_mask_2)
+    
+	# Reduce brightness inside the shadow mask area.
+    img[shadow_mask, 2] *= np.random.uniform() * 0.3 + 0.2 # 0.2 ~ 0.5
+    
+    img = convert_colorspace(img, 'HSV', 'RGB')
+    return img
 ```
 
-Here are some examples 
+Here are some examples for random brightness and random shift transform.
 ![aug](./images/aug.jpg)
+
+Combined random shadow,
+![shadow](./images/shadow.jpg)
 
 After all data augmentation process, the histogram shows the new dataset is much more balanced than the raw dataset.
 
@@ -150,16 +187,9 @@ The histogram is not perfectly symmetrical and flat since it is based on 50 batc
 
 ![hist-aug](./images/hist-center-left-right-aug-equ500.png)
 
-TODO: Add EXAMPLES
-
-After the collection process, I had X number of data points. I then preprocessed this data by ...
-
-
-I finally randomly shuffled the data set and put 20% of the data into a validation set. 
-
-I used this training data for training the model. The validation set helped determine if the model was over or under fitting. The ideal number of epochs was Z as evidenced by ... I used an adam optimizer so that manually training the learning rate wasn't necessary.
-
-
+I finally randomly shuffled the dataset and used this training data for training the model.
+An extra complete circle driving hehavior on the first track was collected as my validation set. 
+The validation set helped determine if the model was over or under fitting. 
 
 ## Model
 

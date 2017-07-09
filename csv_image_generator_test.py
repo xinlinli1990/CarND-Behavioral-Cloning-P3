@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 
 csv_paths = [#{'folder_path': r"G:\simulator_data\back\\", 'csv_file_name': r'cleaned.csv', 'track': 1}, 
              #{'folder_path': r"G:\simulator_data\Track1_2_R\\", 'csv_file_name': r'cleaned.csv', 'type': 'win', 'track': 1},
-             {'folder_path': r"G:\simulator_data\simulator_back\\", 'csv_file_name': r'driving_log.csv', 'type': 'mac', 'track': 1},
-             {'folder_path': r"G:\simulator_data\simulator_side\\", 'csv_file_name': r'driving_log.csv', 'type': 'mac', 'track': 1},
-             {'folder_path': r"G:\simulator_data\simulator_data\\", 'csv_file_name': r'driving_log.csv', 'type': 'mac', 'track': 1},
-             {'folder_path': r"G:\simulator_data\simulator2_back\\", 'csv_file_name': r'driving_log.csv', 'type': 'mac', 'track': 2},
-             {'folder_path': r"G:\simulator_data\simulator2_side\\", 'csv_file_name': r'driving_log.csv', 'type': 'mac', 'track': 2},
+             #{'folder_path': r"G:\simulator_data\simulator_back\\", 'csv_file_name': r'driving_log.csv', 'type': 'mac', 'track': 1},
+             #{'folder_path': r"G:\simulator_data\simulator_side\\", 'csv_file_name': r'driving_log.csv', 'type': 'mac', 'track': 1},
+             #{'folder_path': r"G:\simulator_data\simulator_data\\", 'csv_file_name': r'driving_log.csv', 'type': 'mac', 'track': 1},
+             #{'folder_path': r"G:\simulator_data\simulator2_back\\", 'csv_file_name': r'driving_log.csv', 'type': 'mac', 'track': 2},
+             #{'folder_path': r"G:\simulator_data\simulator2_side\\", 'csv_file_name': r'driving_log.csv', 'type': 'mac', 'track': 2},
              {'folder_path': r"G:\simulator_data\simulator2_data\\", 'csv_file_name': r'driving_log.csv', 'type': 'mac', 'track': 2},
              #{'folder_path': r"G:\simulator_data\Track1_3\\", 'csv_file_name': r'cleaned.csv', 'track': 1},
              #{'folder_path': r"G:\simulator_data\side\\", 'csv_file_name': r'driving_log.csv', 'track': 1},
@@ -22,8 +22,13 @@ for batch in csv_image_generator(csv_paths):
     batch_x = batch[0]
     batch_y = batch[1]
     
-    img = cv2.cvtColor(batch_x[count], cv2.COLOR_BGR2RGB)
-    plt.imsave(str(count) + ".png", img)
+    n = 9
+    for i in range(n):
+        img = cv2.cvtColor(batch_x[i], cv2.COLOR_YUV2BGR)
+        cv2.imwrite(str(count) + str(i) + ".png", img)
+        
+        #img = cv2.cvtColor(batch_x[i], cv2.COLOR_BGR2RGB)
+        #plt.imsave(str(count) + '-' + str(n) + ".png", img)
     # plt.imshow(img)
     # plt.title("Steering angle = " + str(batch_y[count]))
     # plt.show()
