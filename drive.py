@@ -66,7 +66,7 @@ def telemetry(sid, data):
         image_array = np.asarray(image)
         
         # Convert color space from RGB to ? (if necessary)
-        #image_array = cv2.cvtColor(image_array, cv2.COLOR_RGB2HLS) # RGB -> YUV? HLS? HSV?
+        # image_array = cv2.cvtColor(image_array, cv2.COLOR_RGB2HLS) # RGB -> YUV? HLS? HSV?
         
         steering_angle = float(model.predict(image_array[None, :, :, :], batch_size=1))
         
