@@ -240,10 +240,12 @@ model.add(Dropout(0.5))
 model.add(Dense(1))
 ```
 
-Here is a visualization of the architecture
-
-TODO: Add neural network structure, visualization etc.
-
 ### Training Strategy
 
-TODO: Add training process
+I started with the original CNN architecture published by NVIDIA since this model has been proved to work in similar problem.
+This model performs very unstable, the vehicle keep leaving the road. Thus, two dropout layers were added to generalize the model.
+One dropout layer was added to the end of convolutional layers. It force fully connected layers predict steering angle based on a 
+fraction of features extracted from raw image. Another added to the last hidden layer. This layer aims to generalize the 
+fully connected layers. After several rounds testing, the first dropout layer set to 20% dropout rate and the second one set to 50%.
+
+Combining dropout and data augmentation, the model performs well on both track 1 and 2.
